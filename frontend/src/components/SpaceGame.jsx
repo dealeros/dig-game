@@ -90,102 +90,131 @@ const SpaceGame = () => {
     const gameState = gameStateRef.current;
     const hero = heroRef.current;
     
-    // Check if click is in a diggable area
+    // Check if click is in a diggable area (rock)
     const distanceFromCenter = Math.sqrt((x - gameState.centerX) ** 2 + (y - gameState.centerY) ** 2);
     
     let canDig = false;
-    let digFromSphere = false;
-    let digFromTunnel = false;
+    let connectionPoint = null;
     
-    // Check if digging from sphere edge
-    if (distanceFromCenter > gameState.sphereRadius) {
+    // Must be in rock (outside sphere and not in existing tunnel)
+    let inRock = distanceFromCenter > gameState.sphereRadius;
+    
+    if (inRock) {
+      // Check if not in existing tunnel
+      for (const tunnel of gameState.tunnels) {
+        const distToTunnel = Math.sqrt((x - tunnel.x) ** 2 + (y - tunnel.y) ** 2);
+        if (distToTunnel < tunnel.radius) {
+          inRock = false;
+          break;
+        }
+      }
+    }
+    
+    if (inRock) {
+      // Check if hero is in a position to dig (in sphere or tunnel)
       const heroDistFromCenter = Math.sqrt((hero.x - gameState.centerX) ** 2 + (hero.y - gameState.centerY) ** 2);
-      const heroDistFromEdge = Math.abs(heroDistFromCenter - gameState.sphereRadius);
+      let heroInValidPosition = heroDistFromCenter <= gameState.sphereRadius;
       
-      if (heroDistFromEdge < 50) {
-        canDig = true;
-        digFromSphere = true;
-      }
-    }
-    
-    // Check if digging from tunnel edge (expanding existing tunnels)
-    if (!canDig) {
-      for (const tunnel of gameState.tunnels) {
-        const heroDistToTunnel = Math.sqrt((hero.x - tunnel.x) ** 2 + (hero.y - tunnel.y) ** 2);
-        const clickDistToTunnel = Math.sqrt((x - tunnel.x) ** 2 + (y - tunnel.y) ** 2);
-        
-        // Hero is in or near tunnel, and click is outside tunnel but close to it
-        if (heroDistToTunnel < tunnel.radius + 30 && 
-            clickDistToTunnel > tunnel.radius && 
-            clickDistToTunnel < tunnel.radius + gameState.digRadius + 10) {
-          canDig = true;
-          digFromTunnel = true;
-          break;
-        }
-      }
-    }
-    
-    if (canDig) {
-      // Make sure we're not digging into existing tunnels or rock piles
-      let validDigLocation = true;
-      
-      // Check existing tunnels
-      for (const tunnel of gameState.tunnels) {
-        const dist = Math.sqrt((x - tunnel.x) ** 2 + (y - tunnel.y) ** 2);
-        if (dist < tunnel.radius + gameState.digRadius) {
-          validDigLocation = false;
-          break;
-        }
-      }
-      
-      // Check existing rock piles
-      if (validDigLocation) {
-        for (const pile of gameState.rockPiles) {
-          const dist = Math.sqrt((x - pile.x) ** 2 + (y - pile.y) ** 2);
-          if (dist < pile.radius + gameState.digRadius) {
-            validDigLocation = false;
+      if (!heroInValidPosition) {
+        // Check if hero is in any tunnel
+        for (const tunnel of gameState.tunnels) {
+          const heroDistToTunnel = Math.sqrt((hero.x - tunnel.x) ** 2 + (hero.y - tunnel.y) ** 2);
+          if (heroDistToTunnel <= tunnel.radius) {
+            heroInValidPosition = true;
+            connectionPoint = { x: tunnel.x, y: tunnel.y, radius: tunnel.radius };
             break;
+          }
+        }
+      } else {
+        // Hero is in sphere, connection point is closest point on sphere edge toward click
+        const dirX = (x - gameState.centerX) / distanceFromCenter;
+        const dirY = (y - gameState.centerY) / distanceFromCenter;
+        connectionPoint = {
+          x: gameState.centerX + dirX * gameState.sphereRadius,
+          y: gameState.centerY + dirY * gameState.sphereRadius,
+          radius: 0
+        };
+      }
+      
+      if (heroInValidPosition && connectionPoint) {
+        // Check if click is within reasonable digging distance
+        const distanceToClick = Math.sqrt((connectionPoint.x - x) ** 2 + (connectionPoint.y - y) ** 2);
+        if (distanceToClick <= 100) { // Maximum digging distance
+          canDig = true;
+        }
+      }
+    }
+    
+    if (canDig && connectionPoint) {
+      // Create a tunnel segment that connects to the existing space
+      const startX = connectionPoint.x;
+      const startY = connectionPoint.y;
+      const endX = x;
+      const endY = y;
+      
+      // Create connecting tunnel segments
+      const distance = Math.sqrt((endX - startX) ** 2 + (endY - startY) ** 2);
+      const segments = Math.max(1, Math.floor(distance / (gameState.digRadius * 1.5)));
+      
+      let totalRockVolume = 0;
+      
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const segmentX = startX + (endX - startX) * t;
+        const segmentY = startY + (endY - startY) * t;
+        
+        // Check if this position already has a tunnel
+        let alreadyExists = false;
+        for (const tunnel of gameState.tunnels) {
+          const dist = Math.sqrt((segmentX - tunnel.x) ** 2 + (segmentY - tunnel.y) ** 2);
+          if (dist < gameState.digRadius) {
+            alreadyExists = true;
+            break;
+          }
+        }
+        
+        if (!alreadyExists) {
+          // Check if in rock (not in core sphere)
+          const segmentDistFromCenter = Math.sqrt((segmentX - gameState.centerX) ** 2 + (segmentY - gameState.centerY) ** 2);
+          if (segmentDistFromCenter > gameState.sphereRadius) {
+            const tunnel = {
+              id: Date.now() + i,
+              x: segmentX,
+              y: segmentY,
+              radius: gameState.digRadius,
+              timestamp: Date.now(),
+              segment: i,
+              totalSegments: segments
+            };
+            
+            gameState.tunnels.push(tunnel);
+            totalRockVolume += Math.PI * gameState.digRadius * gameState.digRadius;
           }
         }
       }
       
-      if (validDigLocation) {
-        // Create a new tunnel
-        const tunnel = {
-          id: Date.now(),
-          x,
-          y,
-          radius: gameState.digRadius,
-          timestamp: Date.now(),
-          source: digFromSphere ? 'sphere' : 'tunnel'
-        };
+      // Create rock pile from all displaced rock
+      if (totalRockVolume > 0) {
+        const rockPileRadius = Math.sqrt(totalRockVolume / Math.PI) * 0.6;
+        const rockPosition = findEmptySpaceForRock(gameState, x, y, rockPileRadius);
         
-        // Calculate the volume of rock being displaced
-        const rockVolume = Math.PI * gameState.digRadius * gameState.digRadius;
-        const rockPileRadius = Math.sqrt(rockVolume / Math.PI) * 0.7; // Slightly compressed when piled
-        
-        // Find empty space for the displaced rock
-        const rockPosition = findEmptySpaceForRock(gameState, x, y, gameState.digRadius);
-        
-        // Create rock pile
         const rockPile = {
-          id: Date.now() + 1,
+          id: Date.now() + 1000,
           x: rockPosition.x,
           y: rockPosition.y,
           radius: rockPileRadius,
           timestamp: Date.now(),
-          fromTunnel: tunnel.id
+          fromTunnelSegments: segments + 1
         };
         
-        gameState.tunnels.push(tunnel);
         gameState.rockPiles.push(rockPile);
-        gameState.isDigging = true;
-        
-        // Brief digging animation
-        setTimeout(() => {
-          gameState.isDigging = false;
-        }, 200);
       }
+      
+      gameState.isDigging = true;
+      
+      setTimeout(() => {
+        gameState.isDigging = false;
+      }, 300);
     }
   }, [findEmptySpaceForRock]);
 
@@ -300,19 +329,76 @@ const SpaceGame = () => {
     hero.x += hero.vx;
     hero.y += hero.vy;
 
-    // Collision detection with sphere boundaries, tunnels, and rock piles
+    // Store previous position for collision recovery
+    const prevX = hero.x - hero.vx;
+    const prevY = hero.y - hero.vy;
+
+    // Check if current position is in valid space (core sphere or any tunnel)
     const distanceFromCenter = Math.sqrt(
       (hero.x - gameState.centerX) ** 2 + (hero.y - gameState.centerY) ** 2
     );
 
-    // Check if hero can move through tunnels
-    let canMoveInRock = false;
-    for (const tunnel of gameState.tunnels) {
-      const distToTunnel = Math.sqrt((hero.x - tunnel.x) ** 2 + (hero.y - tunnel.y) ** 2);
-      // Hero can move if it's within tunnel radius with some buffer
-      if (distToTunnel <= tunnel.radius - hero.radius + 2) {
-        canMoveInRock = true;
-        break;
+    let inValidSpace = false;
+    
+    // Check if in core sphere
+    if (distanceFromCenter <= gameState.sphereRadius - hero.radius) {
+      inValidSpace = true;
+    }
+    
+    // Check if in any tunnel
+    if (!inValidSpace) {
+      for (const tunnel of gameState.tunnels) {
+        const distToTunnel = Math.sqrt((hero.x - tunnel.x) ** 2 + (hero.y - tunnel.y) ** 2);
+        if (distToTunnel <= tunnel.radius - hero.radius) {
+          inValidSpace = true;
+          break;
+        }
+      }
+    }
+
+    // If not in valid space, find closest valid position
+    if (!inValidSpace) {
+      let closestValidPoint = null;
+      let closestDistance = Infinity;
+
+      // Check distance to core sphere edge
+      const distToCoreEdge = Math.abs(distanceFromCenter - (gameState.sphereRadius - hero.radius));
+      if (distToCoreEdge < closestDistance) {
+        closestDistance = distToCoreEdge;
+        const normalX = (hero.x - gameState.centerX) / distanceFromCenter;
+        const normalY = (hero.y - gameState.centerY) / distanceFromCenter;
+        closestValidPoint = {
+          x: gameState.centerX + normalX * (gameState.sphereRadius - hero.radius),
+          y: gameState.centerY + normalY * (gameState.sphereRadius - hero.radius),
+          type: 'sphere'
+        };
+      }
+
+      // Check distance to each tunnel
+      for (const tunnel of gameState.tunnels) {
+        const distToTunnelCenter = Math.sqrt((hero.x - tunnel.x) ** 2 + (hero.y - tunnel.y) ** 2);
+        const distToTunnelEdge = Math.abs(distToTunnelCenter - (tunnel.radius - hero.radius));
+        
+        if (distToTunnelEdge < closestDistance) {
+          closestDistance = distToTunnelEdge;
+          const normalX = (hero.x - tunnel.x) / distToTunnelCenter;
+          const normalY = (hero.y - tunnel.y) / distToTunnelCenter;
+          closestValidPoint = {
+            x: tunnel.x + normalX * (tunnel.radius - hero.radius),
+            y: tunnel.y + normalY * (tunnel.radius - hero.radius),
+            type: 'tunnel'
+          };
+        }
+      }
+
+      // Move hero to closest valid position
+      if (closestValidPoint) {
+        hero.x = closestValidPoint.x;
+        hero.y = closestValidPoint.y;
+        
+        // Reduce velocity when hitting walls
+        hero.vx *= 0.3;
+        hero.vy *= 0.3;
       }
     }
 
@@ -333,22 +419,6 @@ const SpaceGame = () => {
         hero.vx -= 2 * dotProduct * normalX * 0.6;
         hero.vy -= 2 * dotProduct * normalY * 0.6;
       }
-    }
-
-    // Apply sphere collision: only if outside sphere AND not in a tunnel
-    if (distanceFromCenter + hero.radius > gameState.sphereRadius && !canMoveInRock) {
-      // Calculate collision normal
-      const normalX = (hero.x - gameState.centerX) / distanceFromCenter;
-      const normalY = (hero.y - gameState.centerY) / distanceFromCenter;
-
-      // Position hero at boundary
-      hero.x = gameState.centerX + normalX * (gameState.sphereRadius - hero.radius);
-      hero.y = gameState.centerY + normalY * (gameState.sphereRadius - hero.radius);
-
-      // Softer bounce effect
-      const dotProduct = hero.vx * normalX + hero.vy * normalY;
-      hero.vx -= 2 * dotProduct * normalX * 0.5;
-      hero.vy -= 2 * dotProduct * normalY * 0.5;
     }
 
     // Update stats for display
@@ -468,21 +538,22 @@ const SpaceGame = () => {
       ctx.fillRect(hero.x - hero.radius/2, hero.y + hero.radius, hero.radius, hero.radius/2);
     }
 
-    // Draw digging indicator when near sphere edge or tunnel
+    // Draw digging indicator when hero is in valid digging position
     const heroDistFromCenter = Math.sqrt((hero.x - gameState.centerX) ** 2 + (hero.y - gameState.centerY) ** 2);
-    const heroDistFromEdge = Math.abs(heroDistFromCenter - gameState.sphereRadius);
+    let heroCanDig = heroDistFromCenter <= gameState.sphereRadius;
     
-    // Also check if near any tunnel edge for expansion digging
-    let nearTunnelEdge = false;
-    for (const tunnel of gameState.tunnels) {
-      const distToTunnel = Math.sqrt((hero.x - tunnel.x) ** 2 + (hero.y - tunnel.y) ** 2);
-      if (Math.abs(distToTunnel - tunnel.radius) < 30) {
-        nearTunnelEdge = true;
-        break;
+    // Also check if hero is in any tunnel
+    if (!heroCanDig) {
+      for (const tunnel of gameState.tunnels) {
+        const distToTunnel = Math.sqrt((hero.x - tunnel.x) ** 2 + (hero.y - tunnel.y) ** 2);
+        if (distToTunnel <= tunnel.radius) {
+          heroCanDig = true;
+          break;
+        }
       }
     }
     
-    if (heroDistFromEdge < 50 || nearTunnelEdge) {
+    if (heroCanDig) {
       ctx.strokeStyle = '#ffff00';
       ctx.lineWidth = 2;
       ctx.setLineDash([2, 2]);
@@ -507,32 +578,68 @@ const SpaceGame = () => {
     ctx.lineTo(mouseRef.current.x, mouseRef.current.y + 12);
     ctx.stroke();
 
-    // Show digging cursor when over rock area
+    // Show digging preview when conditions are met
     const mouseDistFromCenter = Math.sqrt(
       (mouseRef.current.x - gameState.centerX) ** 2 + 
       (mouseRef.current.y - gameState.centerY) ** 2
     );
     
-    // Check if mouse is in a diggable area (rock area and hero is close enough)
-    let inDiggableArea = mouseDistFromCenter > gameState.sphereRadius;
-    
-    // Also allow digging from tunnel edges
-    if (!inDiggableArea) {
+    // Check if mouse is in rock and hero can dig
+    let mouseInRock = mouseDistFromCenter > gameState.sphereRadius;
+    if (mouseInRock) {
+      // Make sure mouse is not in existing tunnel
       for (const tunnel of gameState.tunnels) {
-        const mouseDistToTunnel = Math.sqrt((mouseRef.current.x - tunnel.x) ** 2 + (mouseRef.current.y - tunnel.y) ** 2);
-        if (mouseDistToTunnel > tunnel.radius && mouseDistToTunnel < tunnel.radius + gameState.digRadius + 10) {
-          inDiggableArea = true;
+        const distToTunnel = Math.sqrt((mouseRef.current.x - tunnel.x) ** 2 + (mouseRef.current.y - tunnel.y) ** 2);
+        if (distToTunnel < tunnel.radius) {
+          mouseInRock = false;
           break;
         }
       }
     }
     
-    if (inDiggableArea && (heroDistFromEdge < 50 || nearTunnelEdge)) {
-      ctx.strokeStyle = '#ffaa00';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(mouseRef.current.x, mouseRef.current.y, gameState.digRadius, 0, Math.PI * 2);
-      ctx.stroke();
+    if (mouseInRock && heroCanDig) {
+      // Find connection point
+      let connectionPoint = null;
+      if (heroDistFromCenter <= gameState.sphereRadius) {
+        // Connect from sphere
+        const dirX = (mouseRef.current.x - gameState.centerX) / mouseDistFromCenter;
+        const dirY = (mouseRef.current.y - gameState.centerY) / mouseDistFromCenter;
+        connectionPoint = {
+          x: gameState.centerX + dirX * gameState.sphereRadius,
+          y: gameState.centerY + dirY * gameState.sphereRadius
+        };
+      } else {
+        // Connect from tunnel
+        for (const tunnel of gameState.tunnels) {
+          const distToTunnel = Math.sqrt((hero.x - tunnel.x) ** 2 + (hero.y - tunnel.y) ** 2);
+          if (distToTunnel <= tunnel.radius) {
+            connectionPoint = { x: tunnel.x, y: tunnel.y };
+            break;
+          }
+        }
+      }
+      
+      if (connectionPoint) {
+        const distanceToClick = Math.sqrt((connectionPoint.x - mouseRef.current.x) ** 2 + (connectionPoint.y - mouseRef.current.y) ** 2);
+        if (distanceToClick <= 100) {
+          // Draw connection line preview
+          ctx.strokeStyle = '#ffaa00';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.moveTo(connectionPoint.x, connectionPoint.y);
+          ctx.lineTo(mouseRef.current.x, mouseRef.current.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          // Draw target circle
+          ctx.strokeStyle = '#ffaa00';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(mouseRef.current.x, mouseRef.current.y, gameState.digRadius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
     }
 
   }, []);
