@@ -309,14 +309,14 @@ const SpaceGame = () => {
     let canMoveInRock = false;
     for (const tunnel of gameState.tunnels) {
       const distToTunnel = Math.sqrt((hero.x - tunnel.x) ** 2 + (hero.y - tunnel.y) ** 2);
-      // Hero can move if it's within tunnel radius
-      if (distToTunnel < tunnel.radius - hero.radius) {
+      // Hero can move if it's within tunnel radius with some buffer
+      if (distToTunnel <= tunnel.radius - hero.radius + 2) {
         canMoveInRock = true;
         break;
       }
     }
 
-    // Check collision with rock piles (hero bounces off them)
+    // Check collision with rock piles (they float in core space, hero bounces off them)
     for (const pile of gameState.rockPiles) {
       const distToPile = Math.sqrt((hero.x - pile.x) ** 2 + (hero.y - pile.y) ** 2);
       if (distToPile < pile.radius + hero.radius) {
@@ -335,7 +335,7 @@ const SpaceGame = () => {
       }
     }
 
-    // Only apply sphere collision if hero is outside sphere AND not in a valid tunnel
+    // Apply sphere collision: only if outside sphere AND not in a tunnel
     if (distanceFromCenter + hero.radius > gameState.sphereRadius && !canMoveInRock) {
       // Calculate collision normal
       const normalX = (hero.x - gameState.centerX) / distanceFromCenter;
@@ -347,7 +347,7 @@ const SpaceGame = () => {
 
       // Softer bounce effect
       const dotProduct = hero.vx * normalX + hero.vy * normalY;
-      hero.vx -= 2 * dotProduct * normalX * 0.5; // Reduced bounce
+      hero.vx -= 2 * dotProduct * normalX * 0.5;
       hero.vy -= 2 * dotProduct * normalY * 0.5;
     }
 
