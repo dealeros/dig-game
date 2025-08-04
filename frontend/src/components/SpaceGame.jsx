@@ -36,32 +36,29 @@ const SpaceGame = () => {
   });
 
   const findEmptySpaceForRock = useCallback((gameState, excludeX, excludeY, excludeRadius) => {
-    const maxAttempts = 20;
-    const minDistanceFromCenter = gameState.sphereRadius + 30; // Place rock piles outside the main sphere
-    const maxDistanceFromCenter = Math.min(380, 280); // Within canvas bounds
+    const maxAttempts = 30;
+    // Place rock piles in the empty core space where they can float
+    const coreRadius = gameState.sphereRadius - 20; // Inside the core sphere
     
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      // Generate random position in a ring around the sphere
+      // Generate random position within the core sphere (empty space)
       const angle = Math.random() * Math.PI * 2;
-      const distance = minDistanceFromCenter + Math.random() * (maxDistanceFromCenter - minDistanceFromCenter);
+      const distance = Math.random() * coreRadius;
       
       const x = gameState.centerX + Math.cos(angle) * distance;
       const y = gameState.centerY + Math.sin(angle) * distance;
       
-      // Check if this position is clear of existing tunnels and rock piles
+      // Make sure it's actually in empty space (within core sphere)
+      const distFromCenter = Math.sqrt((x - gameState.centerX) ** 2 + (y - gameState.centerY) ** 2);
+      if (distFromCenter > coreRadius) continue;
+      
+      // Check if this position is clear of existing rock piles and hero
       let isValidPosition = true;
       
-      // Check distance from the tunnel being dug
-      const distFromExclude = Math.sqrt((x - excludeX) ** 2 + (y - excludeY) ** 2);
-      if (distFromExclude < excludeRadius + 20) {
-        isValidPosition = false;
-        continue;
-      }
-      
-      // Check existing tunnels
-      for (const tunnel of gameState.tunnels) {
-        const dist = Math.sqrt((x - tunnel.x) ** 2 + (y - tunnel.y) ** 2);
-        if (dist < tunnel.radius + 20) {
+      // Check existing rock piles
+      for (const pile of gameState.rockPiles) {
+        const dist = Math.sqrt((x - pile.x) ** 2 + (y - pile.y) ** 2);
+        if (dist < pile.radius + 20) {
           isValidPosition = false;
           break;
         }
@@ -69,13 +66,12 @@ const SpaceGame = () => {
       
       if (!isValidPosition) continue;
       
-      // Check existing rock piles
-      for (const pile of gameState.rockPiles) {
-        const dist = Math.sqrt((x - pile.x) ** 2 + (y - pile.y) ** 2);
-        if (dist < pile.radius + 15) {
-          isValidPosition = false;
-          break;
-        }
+      // Check distance from hero
+      const heroRef = gameState.hero || { x: gameState.centerX, y: gameState.centerY };
+      const distFromHero = Math.sqrt((x - heroRef.x) ** 2 + (y - heroRef.y) ** 2);
+      if (distFromHero < 30) {
+        isValidPosition = false;
+        continue;
       }
       
       if (isValidPosition) {
@@ -83,10 +79,10 @@ const SpaceGame = () => {
       }
     }
     
-    // Fallback: place it at a default location if no good spot found
+    // Fallback: place it at a safe location in the core
     return {
-      x: gameState.centerX + 250,
-      y: gameState.centerY + Math.random() * 100 - 50
+      x: gameState.centerX + (Math.random() - 0.5) * 100,
+      y: gameState.centerY + (Math.random() - 0.5) * 100
     };
   }, []);
 
