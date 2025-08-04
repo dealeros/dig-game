@@ -38,13 +38,19 @@ const SpaceGame = () => {
     const gameState = gameStateRef.current;
     const hero = heroRef.current;
     
+    console.log('DigTunnel called with:', x, y, 'Hero at:', hero.x, hero.y);
+    
     // Check if click is outside the sphere (in rock area)
     const distanceFromCenter = Math.sqrt((x - gameState.centerX) ** 2 + (y - gameState.centerY) ** 2);
+    
+    console.log('Distance from center:', distanceFromCenter, 'Sphere radius:', gameState.sphereRadius);
     
     if (distanceFromCenter > gameState.sphereRadius) {
       // Check if hero is close enough to dig (within 30 pixels of sphere edge)
       const heroDistFromCenter = Math.sqrt((hero.x - gameState.centerX) ** 2 + (hero.y - gameState.centerY) ** 2);
       const heroDistFromEdge = Math.abs(heroDistFromCenter - gameState.sphereRadius);
+      
+      console.log('Hero distance from center:', heroDistFromCenter, 'Distance from edge:', heroDistFromEdge);
       
       if (heroDistFromEdge < 30) {
         // Create a new tunnel
@@ -60,12 +66,17 @@ const SpaceGame = () => {
         gameState.isDigging = true;
         
         console.log('Tunnel created at:', x, y, 'Total tunnels:', gameState.tunnels.length);
+        console.log('All tunnels:', gameState.tunnels);
         
         // Brief digging animation
         setTimeout(() => {
           gameState.isDigging = false;
         }, 200);
+      } else {
+        console.log('Hero too far from edge to dig. Distance from edge:', heroDistFromEdge);
       }
+    } else {
+      console.log('Click inside sphere, cannot dig');
     }
   }, []);
 
