@@ -178,12 +178,12 @@ const SpaceGame = () => {
       // Check if the entire rock would fit in empty space
       let hasEnoughSpace = true;
       const checkPoints = 16;
-      
+
       for (let i = 0; i < checkPoints; i++) {
         const checkAngle = (i / checkPoints) * Math.PI * 2;
         const checkX = x + Math.cos(checkAngle) * rockRadius;
         const checkY = y + Math.sin(checkAngle) * rockRadius;
-        
+
         if (isInRock(checkX, checkY)) {
           hasEnoughSpace = false;
           break;
@@ -224,23 +224,23 @@ const SpaceGame = () => {
     const steps = 20;
     const dx = rockX - heroX;
     const dy = rockY - heroY;
-    
+
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const checkX = heroX + dx * t;
       const checkY = heroY + dy * t;
-      
+
       // Stop checking when we reach the rock pile edge
       const distToRock = Math.sqrt((checkX - rockX) ** 2 + (checkY - rockY) ** 2);
       if (distToRock <= rockRadius) {
         break;
       }
-      
+
       if (isInRock(checkX, checkY)) {
         return false;
       }
     }
-    
+
     return true;
   }, [isInRock]);
 
@@ -383,6 +383,16 @@ const SpaceGame = () => {
     }
   }, [findEmptySpaceForRock, isInRock]);
 
+  const [isMouseDown, setIsMouseDown] = useState(false);
+
+  const startContinuousDigging = useCallback(() => {
+    setIsMouseDown(true);
+  }, []);
+
+  const stopContinuousDigging = useCallback(() => {
+    setIsMouseDown(false);
+  }, []);
+
   // Initialize canvas and start game
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -407,6 +417,8 @@ const SpaceGame = () => {
     };
 
     const handleMouseDown = (e) => {
+      setIsMouseDown(true);
+
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
@@ -420,16 +432,31 @@ const SpaceGame = () => {
       digTunnel(worldX, worldY);
     };
 
+    const handleMouseUp = (e) => {
+        setIsMouseDown(false);
+    };
+
     canvas.addEventListener('mousemove', handleMouseMove);
     canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mouseup', handleMouseUp);
+
     startGameLoop();
 
     return () => {
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mousedown', handleMouseDown);
+      canvas.removeEventListener('mouseup', handleMouseUp);
+
       stopGameLoop();
     };
-  }, [digTunnel]);
+  }, [digTunnel, startContinuousDigging, stopContinuousDigging]);
+
+  useEffect(() => {
+    if (isMouseDown) {
+      const mouse = mouseRef.current;
+      digTunnel(mouse.x, mouse.y);
+    }
+  }, [isMouseDown, digTunnel]);
 
   const startGameLoop = useCallback(() => {
     gameStateRef.current.isRunning = true;
@@ -437,6 +464,10 @@ const SpaceGame = () => {
     const gameLoop = () => {
       if (!gameStateRef.current.isRunning) return;
 
+      if (isMouseDown) {
+        const mouse = mouseRef.current;
+        digTunnel(mouse.x, mouse.y);
+      }
       updateHero();
       updateCamera();
       render();
@@ -444,7 +475,7 @@ const SpaceGame = () => {
     };
 
     gameLoop();
-  }, []);
+  }, [digTunnel, isMouseDown, updateHero, updateCamera, render]);
 
   const stopGameLoop = useCallback(() => {
     gameStateRef.current.isRunning = false;
