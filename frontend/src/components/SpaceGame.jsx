@@ -38,21 +38,15 @@ const SpaceGame = () => {
     const gameState = gameStateRef.current;
     const hero = heroRef.current;
     
-    console.log('DigTunnel called with:', x, y, 'Hero at:', hero.x, hero.y);
-    
     // Check if click is outside the sphere (in rock area)
     const distanceFromCenter = Math.sqrt((x - gameState.centerX) ** 2 + (y - gameState.centerY) ** 2);
     
-    console.log('Distance from center:', distanceFromCenter, 'Sphere radius:', gameState.sphereRadius);
-    
     if (distanceFromCenter > gameState.sphereRadius) {
-      // Check if hero is close enough to dig (within 30 pixels of sphere edge)
+      // Check if hero is close enough to dig (within 50 pixels of sphere edge for easier gameplay)
       const heroDistFromCenter = Math.sqrt((hero.x - gameState.centerX) ** 2 + (hero.y - gameState.centerY) ** 2);
       const heroDistFromEdge = Math.abs(heroDistFromCenter - gameState.sphereRadius);
       
-      console.log('Hero distance from center:', heroDistFromCenter, 'Distance from edge:', heroDistFromEdge);
-      
-      if (heroDistFromEdge < 30) {
+      if (heroDistFromEdge < 50) {
         // Create a new tunnel
         const tunnel = {
           id: Date.now(),
@@ -65,18 +59,11 @@ const SpaceGame = () => {
         gameState.tunnels.push(tunnel);
         gameState.isDigging = true;
         
-        console.log('Tunnel created at:', x, y, 'Total tunnels:', gameState.tunnels.length);
-        console.log('All tunnels:', gameState.tunnels);
-        
         // Brief digging animation
         setTimeout(() => {
           gameState.isDigging = false;
         }, 200);
-      } else {
-        console.log('Hero too far from edge to dig. Distance from edge:', heroDistFromEdge);
       }
-    } else {
-      console.log('Click inside sphere, cannot dig');
     }
   }, []);
 
@@ -91,19 +78,26 @@ const SpaceGame = () => {
     // Mouse move handler
     const handleMouseMove = (e) => {
       const rect = canvas.getBoundingClientRect();
+      // Scale coordinates to canvas size
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      
       mouseRef.current = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
       };
     };
 
     // Mouse click handler for tunnel digging
     const handleMouseDown = (e) => {
       const rect = canvas.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
+      // Scale coordinates to canvas size
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
       
-      console.log('Mouse click at:', clickX, clickY);
+      const clickX = (e.clientX - rect.left) * scaleX;
+      const clickY = (e.clientY - rect.top) * scaleY;
+      
       digTunnel(clickX, clickY);
     };
 
@@ -189,26 +183,19 @@ const SpaceGame = () => {
       (hero.x - gameState.centerX) ** 2 + (hero.y - gameState.centerY) ** 2
     );
 
-    // Check if hero can move through tunnels - more lenient check
+    // Check if hero can move through tunnels
     let canMoveInRock = false;
     for (const tunnel of gameState.tunnels) {
       const distToTunnel = Math.sqrt((hero.x - tunnel.x) ** 2 + (hero.y - tunnel.y) ** 2);
-      // Hero can move if its center is within tunnel radius (allowing some overlap)
-      if (distToTunnel < tunnel.radius - 2) { // -2 for buffer to prevent edge issues
+      // Hero can move if it's within tunnel radius
+      if (distToTunnel < tunnel.radius - hero.radius) {
         canMoveInRock = true;
-        console.log('Hero in tunnel at:', tunnel.x, tunnel.y, 'Hero distance from tunnel:', distToTunnel, 'Tunnel radius:', tunnel.radius);
         break;
       }
     }
 
-    // Debug logging
-    if (distanceFromCenter + hero.radius > gameState.sphereRadius) {
-      console.log('Hero outside sphere. Distance from center:', distanceFromCenter, 'Can move in rock:', canMoveInRock);
-    }
-
     // Only apply sphere collision if hero is outside sphere AND not in a valid tunnel
     if (distanceFromCenter + hero.radius > gameState.sphereRadius && !canMoveInRock) {
-      console.log('COLLISION TRIGGERED - teleporting hero back to sphere');
       // Calculate collision normal
       const normalX = (hero.x - gameState.centerX) / distanceFromCenter;
       const normalY = (hero.y - gameState.centerY) / distanceFromCenter;
@@ -325,7 +312,7 @@ const SpaceGame = () => {
     const heroDistFromCenter = Math.sqrt((hero.x - gameState.centerX) ** 2 + (hero.y - gameState.centerY) ** 2);
     const heroDistFromEdge = Math.abs(heroDistFromCenter - gameState.sphereRadius);
     
-    if (heroDistFromEdge < 30) {
+    if (heroDistFromEdge < 50) {
       ctx.strokeStyle = '#ffff00';
       ctx.lineWidth = 2;
       ctx.setLineDash([2, 2]);
@@ -356,7 +343,7 @@ const SpaceGame = () => {
       (mouseRef.current.y - gameState.centerY) ** 2
     );
     
-    if (mouseDistFromCenter > gameState.sphereRadius && heroDistFromEdge < 30) {
+    if (mouseDistFromCenter > gameState.sphereRadius && heroDistFromEdge < 50) {
       ctx.strokeStyle = '#ffaa00';
       ctx.lineWidth = 2;
       ctx.beginPath();
