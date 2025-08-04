@@ -29,7 +29,9 @@ const SpaceGame = () => {
 
   const [gameStats, setGameStats] = useState({
     position: { x: 400, y: 300 },
-    velocity: { x: 0, y: 0 }
+    velocity: { x: 0, y: 0 },
+    tunnelsCount: 0,
+    isDigging: false
   });
 
   // Initialize canvas and start game
