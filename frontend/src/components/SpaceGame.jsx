@@ -11,16 +11,20 @@ const SpaceGame = () => {
     vx: 0, // Velocity X
     vy: 0, // Velocity Y
     radius: 4,
-    maxSpeed: 8,
-    acceleration: 0.3,
-    friction: 0.98
+    maxSpeed: 4,
+    acceleration: 0.15,
+    friction: 0.92,
+    stopThreshold: 0.1
   });
 
   const gameStateRef = useRef({
     sphereRadius: 200,
     centerX: 400,
     centerY: 300,
-    isRunning: false
+    isRunning: false,
+    tunnels: [], // Array to store dug tunnels
+    isDigging: false,
+    digRadius: 15
   });
 
   const [gameStats, setGameStats] = useState({
