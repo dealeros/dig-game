@@ -23,6 +23,7 @@ const SpaceGame = () => {
     centerY: 300,
     isRunning: false,
     tunnels: [], // Array to store dug tunnels
+    rockPiles: [], // Array to store displaced rock piles
     isDigging: false,
     digRadius: 15
   });
