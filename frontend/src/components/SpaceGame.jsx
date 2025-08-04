@@ -375,9 +375,10 @@ const SpaceGame = () => {
         <h3 className="text-green-400 font-mono font-bold mb-2">MISSION LOG</h3>
         <div className="text-gray-300 text-sm font-mono space-y-1">
           <p>• Move mouse to navigate your vessel</p>
-          <p>• Zero gravity physics active</p>
-          <p>• Stay within the core sphere</p>
-          <p>• Prepare for rock expeditions...</p>
+          <p>• Click on rock (outside sphere) to dig tunnels</p>
+          <p>• Get close to sphere edge to enable digging</p>
+          <p>• Travel through your tunnels to explore</p>
+          <p>• Discover what lies beyond the rock...</p>
         </div>
       </Card>
     </div>
