@@ -252,7 +252,7 @@ const SpaceGame = () => {
     hero.x += hero.vx;
     hero.y += hero.vy;
 
-    // Collision detection with sphere boundaries and tunnels
+    // Collision detection with sphere boundaries, tunnels, and rock piles
     const distanceFromCenter = Math.sqrt(
       (hero.x - gameState.centerX) ** 2 + (hero.y - gameState.centerY) ** 2
     );
@@ -265,6 +265,25 @@ const SpaceGame = () => {
       if (distToTunnel < tunnel.radius - hero.radius) {
         canMoveInRock = true;
         break;
+      }
+    }
+
+    // Check collision with rock piles (hero bounces off them)
+    for (const pile of gameState.rockPiles) {
+      const distToPile = Math.sqrt((hero.x - pile.x) ** 2 + (hero.y - pile.y) ** 2);
+      if (distToPile < pile.radius + hero.radius) {
+        // Calculate collision normal
+        const normalX = (hero.x - pile.x) / distToPile;
+        const normalY = (hero.y - pile.y) / distToPile;
+
+        // Push hero away from rock pile
+        hero.x = pile.x + normalX * (pile.radius + hero.radius + 1);
+        hero.y = pile.y + normalY * (pile.radius + hero.radius + 1);
+
+        // Bounce off rock pile
+        const dotProduct = hero.vx * normalX + hero.vy * normalY;
+        hero.vx -= 2 * dotProduct * normalX * 0.6;
+        hero.vy -= 2 * dotProduct * normalY * 0.6;
       }
     }
 
