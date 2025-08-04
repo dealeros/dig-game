@@ -231,6 +231,35 @@ const SpaceGame = () => {
     ctx.arc(gameState.centerX, gameState.centerY, gameState.sphereRadius, 0, Math.PI * 2);
     ctx.fill();
 
+    // Draw tunnels in the rock
+    ctx.fillStyle = '#1a1a1a'; // Same as living space
+    for (const tunnel of gameState.tunnels) {
+      ctx.beginPath();
+      ctx.arc(tunnel.x, tunnel.y, tunnel.radius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Draw tunnel outline
+      ctx.strokeStyle = '#444';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      
+      // Add tunnel grid pattern
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 0.5;
+      const gridSize = 5;
+      for (let x = tunnel.x - tunnel.radius; x <= tunnel.x + tunnel.radius; x += gridSize) {
+        for (let y = tunnel.y - tunnel.radius; y <= tunnel.y + tunnel.radius; y += gridSize) {
+          const distFromTunnelCenter = Math.sqrt((x - tunnel.x) ** 2 + (y - tunnel.y) ** 2);
+          if (distFromTunnelCenter < tunnel.radius) {
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + 1, y);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
     // Draw sphere boundary (retro pixel style)
     ctx.strokeStyle = '#444';
     ctx.lineWidth = 2;
@@ -258,7 +287,8 @@ const SpaceGame = () => {
     }
 
     // Draw hero (retro pixel ship)
-    ctx.fillStyle = '#00ff88'; // Bright green for hero
+    const heroColor = gameState.isDigging ? '#ffff00' : '#00ff88'; // Yellow when digging
+    ctx.fillStyle = heroColor;
     ctx.fillRect(hero.x - hero.radius, hero.y - hero.radius, hero.radius * 2, hero.radius * 2);
     
     // Add thruster effect based on velocity
@@ -266,6 +296,20 @@ const SpaceGame = () => {
     if (speed > 0.5) {
       ctx.fillStyle = '#ff6600';
       ctx.fillRect(hero.x - hero.radius/2, hero.y + hero.radius, hero.radius, hero.radius/2);
+    }
+
+    // Draw digging indicator when near sphere edge
+    const heroDistFromCenter = Math.sqrt((hero.x - gameState.centerX) ** 2 + (hero.y - gameState.centerY) ** 2);
+    const heroDistFromEdge = Math.abs(heroDistFromCenter - gameState.sphereRadius);
+    
+    if (heroDistFromEdge < 30) {
+      ctx.strokeStyle = '#ffff00';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.arc(hero.x, hero.y, 15, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     // Draw mouse cursor as target
@@ -282,6 +326,20 @@ const SpaceGame = () => {
     ctx.moveTo(mouseRef.current.x, mouseRef.current.y - 12);
     ctx.lineTo(mouseRef.current.x, mouseRef.current.y + 12);
     ctx.stroke();
+
+    // Show digging cursor when over rock
+    const mouseDistFromCenter = Math.sqrt(
+      (mouseRef.current.x - gameState.centerX) ** 2 + 
+      (mouseRef.current.y - gameState.centerY) ** 2
+    );
+    
+    if (mouseDistFromCenter > gameState.sphereRadius && heroDistFromEdge < 30) {
+      ctx.strokeStyle = '#ffaa00';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(mouseRef.current.x, mouseRef.current.y, gameState.digRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
   }, []);
 
