@@ -142,6 +142,27 @@ const SpaceGame = () => {
     camera.y += (targetY - camera.y) * 0.1;
   }, []);
 
+  const isInRock = useCallback((x, y) => {
+    const gameState = gameStateRef.current;
+
+    // Check if in original sphere
+    const distFromCenter = Math.sqrt((x - gameState.centerX) ** 2 + (y - gameState.centerY) ** 2);
+    if (distFromCenter <= gameState.sphereRadius) {
+      return false;
+    }
+
+    // Check if in any tunnel
+    for (const tunnel of gameState.tunnels) {
+      const distToTunnel = Math.sqrt((x - tunnel.x) ** 2 + (y - tunnel.y) ** 2);
+      if (distToTunnel <= tunnel.radius) {
+        return false;
+      }
+    }
+
+    // Check procedural rock
+    return getRockDensity(x, y) > 0;
+  }, [getRockDensity]);
+
   const findEmptySpaceForRock = useCallback((gameState, rockRadius, targetX, targetY) => {
     const maxAttempts = 50;
     const hero = heroRef.current;
@@ -198,27 +219,6 @@ const SpaceGame = () => {
 
     return null; // No valid position found
   }, [isInRock]);
-
-  const isInRock = useCallback((x, y) => {
-    const gameState = gameStateRef.current;
-
-    // Check if in original sphere
-    const distFromCenter = Math.sqrt((x - gameState.centerX) ** 2 + (y - gameState.centerY) ** 2);
-    if (distFromCenter <= gameState.sphereRadius) {
-      return false;
-    }
-
-    // Check if in any tunnel
-    for (const tunnel of gameState.tunnels) {
-      const distToTunnel = Math.sqrt((x - tunnel.x) ** 2 + (y - tunnel.y) ** 2);
-      if (distToTunnel <= tunnel.radius) {
-        return false;
-      }
-    }
-
-    // Check procedural rock
-    return getRockDensity(x, y) > 0;
-  }, [getRockDensity]);
 
   const hasPathToRock = useCallback((heroX, heroY, rockX, rockY, rockRadius) => {
     const steps = 20;
