@@ -35,6 +35,61 @@ const SpaceGame = () => {
     isDigging: false
   });
 
+  const findEmptySpaceForRock = useCallback((gameState, excludeX, excludeY, excludeRadius) => {
+    const maxAttempts = 20;
+    const minDistanceFromCenter = gameState.sphereRadius + 30; // Place rock piles outside the main sphere
+    const maxDistanceFromCenter = Math.min(380, 280); // Within canvas bounds
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // Generate random position in a ring around the sphere
+      const angle = Math.random() * Math.PI * 2;
+      const distance = minDistanceFromCenter + Math.random() * (maxDistanceFromCenter - minDistanceFromCenter);
+      
+      const x = gameState.centerX + Math.cos(angle) * distance;
+      const y = gameState.centerY + Math.sin(angle) * distance;
+      
+      // Check if this position is clear of existing tunnels and rock piles
+      let isValidPosition = true;
+      
+      // Check distance from the tunnel being dug
+      const distFromExclude = Math.sqrt((x - excludeX) ** 2 + (y - excludeY) ** 2);
+      if (distFromExclude < excludeRadius + 20) {
+        isValidPosition = false;
+        continue;
+      }
+      
+      // Check existing tunnels
+      for (const tunnel of gameState.tunnels) {
+        const dist = Math.sqrt((x - tunnel.x) ** 2 + (y - tunnel.y) ** 2);
+        if (dist < tunnel.radius + 20) {
+          isValidPosition = false;
+          break;
+        }
+      }
+      
+      if (!isValidPosition) continue;
+      
+      // Check existing rock piles
+      for (const pile of gameState.rockPiles) {
+        const dist = Math.sqrt((x - pile.x) ** 2 + (y - pile.y) ** 2);
+        if (dist < pile.radius + 15) {
+          isValidPosition = false;
+          break;
+        }
+      }
+      
+      if (isValidPosition) {
+        return { x, y };
+      }
+    }
+    
+    // Fallback: place it at a default location if no good spot found
+    return {
+      x: gameState.centerX + 250,
+      y: gameState.centerY + Math.random() * 100 - 50
+    };
+  }, []);
+
   const digTunnel = useCallback((x, y) => {
     const gameState = gameStateRef.current;
     const hero = heroRef.current;
@@ -57,7 +112,25 @@ const SpaceGame = () => {
           timestamp: Date.now()
         };
         
+        // Calculate the volume of rock being displaced
+        const rockVolume = Math.PI * gameState.digRadius * gameState.digRadius;
+        const rockPileRadius = Math.sqrt(rockVolume / Math.PI) * 0.7; // Slightly compressed when piled
+        
+        // Find empty space for the displaced rock
+        const rockPosition = findEmptySpaceForRock(gameState, x, y, gameState.digRadius);
+        
+        // Create rock pile
+        const rockPile = {
+          id: Date.now() + 1,
+          x: rockPosition.x,
+          y: rockPosition.y,
+          radius: rockPileRadius,
+          timestamp: Date.now(),
+          fromTunnel: tunnel.id
+        };
+        
         gameState.tunnels.push(tunnel);
+        gameState.rockPiles.push(rockPile);
         gameState.isDigging = true;
         
         // Brief digging animation
@@ -66,7 +139,7 @@ const SpaceGame = () => {
         }, 200);
       }
     }
-  }, []);
+  }, [findEmptySpaceForRock]);
 
   // Initialize canvas and start game
   useEffect(() => {
