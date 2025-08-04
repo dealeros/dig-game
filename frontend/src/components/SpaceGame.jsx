@@ -309,25 +309,20 @@ const SpaceGame = () => {
     ctx.fillStyle = '#2a2a2a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw the living sphere (hollow center)
+    // Draw the living sphere (hollow center) - no border
     ctx.fillStyle = '#1a1a1a'; // Darker for the living space
     ctx.beginPath();
     ctx.arc(gameState.centerX, gameState.centerY, gameState.sphereRadius, 0, Math.PI * 2);
     ctx.fill();
 
-    // Draw tunnels in the rock
+    // Draw tunnels in the rock - no borders
     ctx.fillStyle = '#1a1a1a'; // Same as living space
     for (const tunnel of gameState.tunnels) {
       ctx.beginPath();
       ctx.arc(tunnel.x, tunnel.y, tunnel.radius, 0, Math.PI * 2);
       ctx.fill();
       
-      // Draw tunnel outline
-      ctx.strokeStyle = '#444';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      
-      // Add tunnel grid pattern
+      // Add tunnel grid pattern for texture
       ctx.strokeStyle = '#333';
       ctx.lineWidth = 0.5;
       const gridSize = 5;
@@ -344,14 +339,29 @@ const SpaceGame = () => {
       }
     }
 
-    // Draw sphere boundary (retro pixel style)
-    ctx.strokeStyle = '#444';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4, 4]); // Dashed line for retro feel
-    ctx.beginPath();
-    ctx.arc(gameState.centerX, gameState.centerY, gameState.sphereRadius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]); // Reset dash
+    // Draw displaced rock piles
+    for (const pile of gameState.rockPiles) {
+      // Draw rock pile with a slightly different texture
+      ctx.fillStyle = '#3a3a3a'; // Slightly lighter than surrounding rock
+      ctx.beginPath();
+      ctx.arc(pile.x, pile.y, pile.radius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Add rock pile texture with dots/chunks
+      ctx.fillStyle = '#4a4a4a';
+      const chunks = 8;
+      for (let i = 0; i < chunks; i++) {
+        const angle = (i / chunks) * Math.PI * 2;
+        const distance = Math.random() * pile.radius * 0.6;
+        const chunkX = pile.x + Math.cos(angle) * distance;
+        const chunkY = pile.y + Math.sin(angle) * distance;
+        const chunkSize = 1 + Math.random() * 2;
+        
+        ctx.beginPath();
+        ctx.arc(chunkX, chunkY, chunkSize, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
 
     // Draw grid pattern in living space for retro feel
     ctx.strokeStyle = '#333';
@@ -382,11 +392,21 @@ const SpaceGame = () => {
       ctx.fillRect(hero.x - hero.radius/2, hero.y + hero.radius, hero.radius, hero.radius/2);
     }
 
-    // Draw digging indicator when near sphere edge
+    // Draw digging indicator when near sphere edge or tunnel
     const heroDistFromCenter = Math.sqrt((hero.x - gameState.centerX) ** 2 + (hero.y - gameState.centerY) ** 2);
     const heroDistFromEdge = Math.abs(heroDistFromCenter - gameState.sphereRadius);
     
-    if (heroDistFromEdge < 50) {
+    // Also check if near any tunnel edge for expansion digging
+    let nearTunnelEdge = false;
+    for (const tunnel of gameState.tunnels) {
+      const distToTunnel = Math.sqrt((hero.x - tunnel.x) ** 2 + (hero.y - tunnel.y) ** 2);
+      if (Math.abs(distToTunnel - tunnel.radius) < 30) {
+        nearTunnelEdge = true;
+        break;
+      }
+    }
+    
+    if (heroDistFromEdge < 50 || nearTunnelEdge) {
       ctx.strokeStyle = '#ffff00';
       ctx.lineWidth = 2;
       ctx.setLineDash([2, 2]);
@@ -411,13 +431,27 @@ const SpaceGame = () => {
     ctx.lineTo(mouseRef.current.x, mouseRef.current.y + 12);
     ctx.stroke();
 
-    // Show digging cursor when over rock
+    // Show digging cursor when over rock area
     const mouseDistFromCenter = Math.sqrt(
       (mouseRef.current.x - gameState.centerX) ** 2 + 
       (mouseRef.current.y - gameState.centerY) ** 2
     );
     
-    if (mouseDistFromCenter > gameState.sphereRadius && heroDistFromEdge < 50) {
+    // Check if mouse is in a diggable area (rock area and hero is close enough)
+    let inDiggableArea = mouseDistFromCenter > gameState.sphereRadius;
+    
+    // Also allow digging from tunnel edges
+    if (!inDiggableArea) {
+      for (const tunnel of gameState.tunnels) {
+        const mouseDistToTunnel = Math.sqrt((mouseRef.current.x - tunnel.x) ** 2 + (mouseRef.current.y - tunnel.y) ** 2);
+        if (mouseDistToTunnel > tunnel.radius && mouseDistToTunnel < tunnel.radius + gameState.digRadius + 10) {
+          inDiggableArea = true;
+          break;
+        }
+      }
+    }
+    
+    if (inDiggableArea && (heroDistFromEdge < 50 || nearTunnelEdge)) {
       ctx.strokeStyle = '#ffaa00';
       ctx.lineWidth = 2;
       ctx.beginPath();
