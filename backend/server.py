@@ -52,6 +52,11 @@ async def get_status_checks():
     status_checks = await db.status_checks.find().to_list(1000)
     return [StatusCheck(**status_check) for status_check in status_checks]
 
+# Add a root route to the main app
+@app.get("/")
+async def main_root():
+    return {"message": "FastAPI backend is running", "api_docs": "/docs"}
+
 # Include the router in the main app
 app.include_router(api_router)
 
