@@ -71,6 +71,39 @@ const SpaceGame = () => {
     };
   }, []);
 
+  const digTunnel = useCallback((x, y) => {
+    const gameState = gameStateRef.current;
+    const hero = heroRef.current;
+    
+    // Check if click is outside the sphere (in rock area)
+    const distanceFromCenter = Math.sqrt((x - gameState.centerX) ** 2 + (y - gameState.centerY) ** 2);
+    
+    if (distanceFromCenter > gameState.sphereRadius) {
+      // Check if hero is close enough to dig (within 30 pixels of sphere edge)
+      const heroDistFromCenter = Math.sqrt((hero.x - gameState.centerX) ** 2 + (hero.y - gameState.centerY) ** 2);
+      const heroDistFromEdge = Math.abs(heroDistFromCenter - gameState.sphereRadius);
+      
+      if (heroDistFromEdge < 30) {
+        // Create a new tunnel
+        const tunnel = {
+          id: Date.now(),
+          x,
+          y,
+          radius: gameState.digRadius,
+          timestamp: Date.now()
+        };
+        
+        gameState.tunnels.push(tunnel);
+        gameState.isDigging = true;
+        
+        // Brief digging animation
+        setTimeout(() => {
+          gameState.isDigging = false;
+        }, 200);
+      }
+    }
+  }, []);
+
   const startGameLoop = useCallback(() => {
     gameStateRef.current.isRunning = true;
     
