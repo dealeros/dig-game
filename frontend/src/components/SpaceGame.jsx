@@ -594,6 +594,7 @@ const SpaceGame = () => {
     ctx.restore();
 
     // Draw UI elements (screen space)
+    const mouse = mouseRef.current;
     const screenMouseX = mouse.x - camera.x;
     const screenMouseY = mouse.y - camera.y;
 
