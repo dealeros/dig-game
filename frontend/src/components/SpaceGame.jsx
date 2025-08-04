@@ -196,7 +196,7 @@ const SpaceGame = () => {
       // Hero can move if its center is within tunnel radius (allowing some overlap)
       if (distToTunnel < tunnel.radius - 2) { // -2 for buffer to prevent edge issues
         canMoveInRock = true;
-        console.log('Hero in tunnel:', tunnel.x, tunnel.y, 'Distance:', distToTunnel, 'Tunnel radius:', tunnel.radius);
+        console.log('Hero in tunnel at:', tunnel.x, tunnel.y, 'Hero distance from tunnel:', distToTunnel, 'Tunnel radius:', tunnel.radius);
         break;
       }
     }
