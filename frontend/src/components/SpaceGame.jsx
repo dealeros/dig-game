@@ -104,7 +104,7 @@ const SpaceGame = () => {
       canvas.removeEventListener('mousedown', handleMouseDown);
       stopGameLoop();
     };
-  }, [digTunnel, startGameLoop, stopGameLoop]);
+  }, [digTunnel]);
 
   const startGameLoop = useCallback(() => {
     gameStateRef.current.isRunning = true;
