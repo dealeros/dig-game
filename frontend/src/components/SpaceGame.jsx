@@ -175,16 +175,18 @@ const SpaceGame = () => {
       (hero.x - gameState.centerX) ** 2 + (hero.y - gameState.centerY) ** 2
     );
 
-    // Check if hero can move through tunnels
+    // Check if hero can move through tunnels (account for hero radius)
     let canMoveInRock = false;
     for (const tunnel of gameState.tunnels) {
       const distToTunnel = Math.sqrt((hero.x - tunnel.x) ** 2 + (hero.y - tunnel.y) ** 2);
-      if (distToTunnel < tunnel.radius) {
+      // Hero can move if its center is within tunnel radius minus hero radius
+      if (distToTunnel + hero.radius < tunnel.radius) {
         canMoveInRock = true;
         break;
       }
     }
 
+    // Only apply sphere collision if hero is outside sphere AND not in a valid tunnel
     if (distanceFromCenter + hero.radius > gameState.sphereRadius && !canMoveInRock) {
       // Calculate collision normal
       const normalX = (hero.x - gameState.centerX) / distanceFromCenter;
