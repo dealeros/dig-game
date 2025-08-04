@@ -66,6 +66,7 @@ const SpaceGame = () => {
 
     return () => {
       canvas.removeEventListener('mousemove', handleMouseMove);
+      canvas.removeEventListener('mousedown', handleMouseDown);
       stopGameLoop();
     };
   }, []);
