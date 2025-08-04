@@ -51,7 +51,17 @@ const SpaceGame = () => {
       };
     };
 
+    // Mouse click handler for tunnel digging
+    const handleMouseDown = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      
+      digTunnel(clickX, clickY);
+    };
+
     canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mousedown', handleMouseDown);
     startGameLoop();
 
     return () => {
