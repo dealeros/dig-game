@@ -406,20 +406,29 @@ const SpaceGame = () => {
       }
     }
 
-    // Draw displaced rock piles
+    // Draw displaced rock piles (floating in core space)
     for (const pile of gameState.rockPiles) {
-      // Draw rock pile with a slightly different texture
-      ctx.fillStyle = '#3a3a3a'; // Slightly lighter than surrounding rock
+      // Draw floating rock pile with glow effect to show it's floating
+      ctx.fillStyle = '#4a4a4a'; // Lighter than surrounding rock
       ctx.beginPath();
       ctx.arc(pile.x, pile.y, pile.radius, 0, Math.PI * 2);
       ctx.fill();
       
-      // Add rock pile texture with dots/chunks
-      ctx.fillStyle = '#4a4a4a';
-      const chunks = 8;
+      // Add floating glow effect
+      ctx.strokeStyle = '#666';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(pile.x, pile.y, pile.radius + 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      // Add rock pile texture with chunks
+      ctx.fillStyle = '#5a5a5a';
+      const chunks = 6;
       for (let i = 0; i < chunks; i++) {
         const angle = (i / chunks) * Math.PI * 2;
-        const distance = Math.random() * pile.radius * 0.6;
+        const distance = Math.random() * pile.radius * 0.5;
         const chunkX = pile.x + Math.cos(angle) * distance;
         const chunkY = pile.y + Math.sin(angle) * distance;
         const chunkSize = 1 + Math.random() * 2;
