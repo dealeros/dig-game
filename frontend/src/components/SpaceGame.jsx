@@ -135,18 +135,29 @@ const SpaceGame = () => {
     const dy = mouse.y - hero.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    // Apply movement towards mouse (zero gravity physics)
-    if (distance > 5) { // Dead zone around mouse
+    // Improved movement - less springy, more controlled
+    if (distance > 3) { // Smaller dead zone
       const dirX = dx / distance;
       const dirY = dy / distance;
       
-      hero.vx += dirX * hero.acceleration;
-      hero.vy += dirY * hero.acceleration;
+      // Reduce acceleration when close to target
+      const accel = distance > 50 ? hero.acceleration : hero.acceleration * (distance / 50);
+      
+      hero.vx += dirX * accel;
+      hero.vy += dirY * accel;
+    } else {
+      // Strong deceleration when very close to mouse
+      hero.vx *= 0.8;
+      hero.vy *= 0.8;
     }
 
     // Apply friction
     hero.vx *= hero.friction;
     hero.vy *= hero.friction;
+
+    // Stop very small movements to reduce jitter
+    if (Math.abs(hero.vx) < hero.stopThreshold) hero.vx = 0;
+    if (Math.abs(hero.vy) < hero.stopThreshold) hero.vy = 0;
 
     // Limit maximum speed
     const currentSpeed = Math.sqrt(hero.vx * hero.vx + hero.vy * hero.vy);
@@ -159,12 +170,22 @@ const SpaceGame = () => {
     hero.x += hero.vx;
     hero.y += hero.vy;
 
-    // Collision detection with sphere boundaries
+    // Collision detection with sphere boundaries and tunnels
     const distanceFromCenter = Math.sqrt(
       (hero.x - gameState.centerX) ** 2 + (hero.y - gameState.centerY) ** 2
     );
 
-    if (distanceFromCenter + hero.radius > gameState.sphereRadius) {
+    // Check if hero can move through tunnels
+    let canMoveInRock = false;
+    for (const tunnel of gameState.tunnels) {
+      const distToTunnel = Math.sqrt((hero.x - tunnel.x) ** 2 + (hero.y - tunnel.y) ** 2);
+      if (distToTunnel < tunnel.radius) {
+        canMoveInRock = true;
+        break;
+      }
+    }
+
+    if (distanceFromCenter + hero.radius > gameState.sphereRadius && !canMoveInRock) {
       // Calculate collision normal
       const normalX = (hero.x - gameState.centerX) / distanceFromCenter;
       const normalY = (hero.y - gameState.centerY) / distanceFromCenter;
@@ -173,16 +194,18 @@ const SpaceGame = () => {
       hero.x = gameState.centerX + normalX * (gameState.sphereRadius - hero.radius);
       hero.y = gameState.centerY + normalY * (gameState.sphereRadius - hero.radius);
 
-      // Reflect velocity (bounce effect)
+      // Softer bounce effect
       const dotProduct = hero.vx * normalX + hero.vy * normalY;
-      hero.vx -= 2 * dotProduct * normalX * 0.8; // 0.8 for energy loss
-      hero.vy -= 2 * dotProduct * normalY * 0.8;
+      hero.vx -= 2 * dotProduct * normalX * 0.5; // Reduced bounce
+      hero.vy -= 2 * dotProduct * normalY * 0.5;
     }
 
     // Update stats for display
     setGameStats({
       position: { x: Math.round(hero.x), y: Math.round(hero.y) },
-      velocity: { x: Math.round(hero.vx * 10) / 10, y: Math.round(hero.vy * 10) / 10 }
+      velocity: { x: Math.round(hero.vx * 10) / 10, y: Math.round(hero.vy * 10) / 10 },
+      tunnelsCount: gameState.tunnels.length,
+      isDigging: gameState.isDigging
     });
   }, []);
 
