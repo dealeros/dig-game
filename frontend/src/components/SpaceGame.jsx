@@ -142,27 +142,41 @@ const SpaceGame = () => {
     camera.y += (targetY - camera.y) * 0.1;
   }, []);
 
-  const findEmptySpaceForRock = useCallback((gameState, excludeX, excludeY, excludeRadius) => {
-    const maxAttempts = 30;
+  const findEmptySpaceForRock = useCallback((gameState, rockRadius, targetX, targetY) => {
+    const maxAttempts = 50;
     const hero = heroRef.current;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      // Generate random position around hero
+      // Generate random position around the target location
       const angle = Math.random() * Math.PI * 2;
-      const distance = 50 + Math.random() * 150;
+      const distance = rockRadius * 3 + Math.random() * 100;
 
-      const x = hero.x + Math.cos(angle) * distance;
-      const y = hero.y + Math.sin(angle) * distance;
+      const x = targetX + Math.cos(angle) * distance;
+      const y = targetY + Math.sin(angle) * distance;
 
-      // Make sure it's in empty space (not in rock)
-      if (getRockDensity(x, y) > 0) continue;
+      // Check if the entire rock would fit in empty space
+      let hasEnoughSpace = true;
+      const checkPoints = 16;
+      
+      for (let i = 0; i < checkPoints; i++) {
+        const checkAngle = (i / checkPoints) * Math.PI * 2;
+        const checkX = x + Math.cos(checkAngle) * rockRadius;
+        const checkY = y + Math.sin(checkAngle) * rockRadius;
+        
+        if (isInRock(checkX, checkY)) {
+          hasEnoughSpace = false;
+          break;
+        }
+      }
+
+      if (!hasEnoughSpace) continue;
 
       // Check if this position is clear of existing rock piles
       let isValidPosition = true;
 
       for (const pile of gameState.rockPiles) {
         const dist = Math.sqrt((x - pile.x) ** 2 + (y - pile.y) ** 2);
-        if (dist < pile.radius + 20) {
+        if (dist < pile.radius + rockRadius + 10) {
           isValidPosition = false;
           break;
         }
@@ -172,7 +186,7 @@ const SpaceGame = () => {
 
       // Check distance from hero
       const distFromHero = Math.sqrt((x - hero.x) ** 2 + (y - hero.y) ** 2);
-      if (distFromHero < 30) {
+      if (distFromHero < hero.radius + rockRadius + 15) {
         isValidPosition = false;
         continue;
       }
@@ -182,12 +196,8 @@ const SpaceGame = () => {
       }
     }
 
-    // Fallback: place it at a safe location
-    return {
-      x: hero.x + (Math.random() - 0.5) * 100,
-      y: hero.y + (Math.random() - 0.5) * 100
-    };
-  }, [getRockDensity]);
+    return null; // No valid position found
+  }, [isInRock]);
 
   const isInRock = useCallback((x, y) => {
     const gameState = gameStateRef.current;
@@ -209,6 +219,30 @@ const SpaceGame = () => {
     // Check procedural rock
     return getRockDensity(x, y) > 0;
   }, [getRockDensity]);
+
+  const hasPathToRock = useCallback((heroX, heroY, rockX, rockY, rockRadius) => {
+    const steps = 20;
+    const dx = rockX - heroX;
+    const dy = rockY - heroY;
+    
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const checkX = heroX + dx * t;
+      const checkY = heroY + dy * t;
+      
+      // Stop checking when we reach the rock pile edge
+      const distToRock = Math.sqrt((checkX - rockX) ** 2 + (checkY - rockY) ** 2);
+      if (distToRock <= rockRadius) {
+        break;
+      }
+      
+      if (isInRock(checkX, checkY)) {
+        return false;
+      }
+    }
+    
+    return true;
+  }, [isInRock]);
 
   const digTunnel = useCallback((x, y) => {
     const gameState = gameStateRef.current;
@@ -232,7 +266,8 @@ const SpaceGame = () => {
       const distToPile = Math.sqrt((x - pile.x) ** 2 + (y - pile.y) ** 2);
       if (distToPile <= pile.radius + gameState.digRadius) {
         const distanceToHero = Math.sqrt((hero.x - pile.x) ** 2 + (hero.y - pile.y) ** 2);
-        if (distanceToHero <= 120) {
+        // Check if hero has a clear path to the rock pile
+        if (distanceToHero <= 120 && hasPathToRock(hero.x, hero.y, pile.x, pile.y, pile.radius)) {
           canDig = true;
           digType = 'rockPile';
           targetRockPile = pile;
@@ -269,15 +304,17 @@ const SpaceGame = () => {
 
     if (canDig) {
       if (digType === 'rockPile') {
-        const newPosition = findEmptySpaceForRock(gameState, targetRockPile.x, targetRockPile.y, targetRockPile.radius);
-        targetRockPile.x = newPosition.x;
-        targetRockPile.y = newPosition.y;
-        targetRockPile.timestamp = Date.now();
+        const newPosition = findEmptySpaceForRock(gameState, targetRockPile.radius, targetRockPile.x, targetRockPile.y);
+        if (newPosition) {
+          targetRockPile.x = newPosition.x;
+          targetRockPile.y = newPosition.y;
+          targetRockPile.timestamp = Date.now();
 
-        gameState.isDigging = true;
-        setTimeout(() => {
-          gameState.isDigging = false;
-        }, 200);
+          gameState.isDigging = true;
+          setTimeout(() => {
+            gameState.isDigging = false;
+          }, 200);
+        }
 
       } else if (digType === 'rock') {
         const startX = connectionPoint.x;
@@ -322,18 +359,20 @@ const SpaceGame = () => {
 
         if (totalRockVolume > 0) {
           const rockPileRadius = Math.sqrt(totalRockVolume / Math.PI) * 0.6;
-          const rockPosition = findEmptySpaceForRock(gameState, x, y, rockPileRadius);
+          const rockPosition = findEmptySpaceForRock(gameState, rockPileRadius, x, y);
 
-          const rockPile = {
-            id: Date.now() + 1000,
-            x: rockPosition.x,
-            y: rockPosition.y,
-            radius: rockPileRadius,
-            timestamp: Date.now(),
-            fromTunnelSegments: segments + 1
-          };
+          if (rockPosition) {
+            const rockPile = {
+              id: Date.now() + 1000,
+              x: rockPosition.x,
+              y: rockPosition.y,
+              radius: rockPileRadius,
+              timestamp: Date.now(),
+              fromTunnelSegments: segments + 1
+            };
 
-          gameState.rockPiles.push(rockPile);
+            gameState.rockPiles.push(rockPile);
+          }
         }
 
         gameState.isDigging = true;
@@ -449,39 +488,35 @@ const SpaceGame = () => {
       hero.vy = (hero.vy / currentSpeed) * hero.maxSpeed;
     }
 
-    hero.x += hero.vx;
-    hero.y += hero.vy;
+    // Store previous position
+    const prevX = hero.x;
+    const prevY = hero.y;
 
-    // Check if current position is valid
-    let inValidSpace = !isInRock(hero.x, hero.y);
+    // Try to move
+    const newX = hero.x + hero.vx;
+    const newY = hero.y + hero.vy;
 
-    if (!inValidSpace) {
-      // Find closest valid position
-      const searchRadius = 20;
-      let closestValidPoint = null;
-      let closestDistance = Infinity;
-
-      for (let angle = 0; angle < Math.PI * 2; angle += 0.1) {
-        for (let r = hero.radius; r < searchRadius; r += 2) {
-          const testX = hero.x + Math.cos(angle) * r;
-          const testY = hero.y + Math.sin(angle) * r;
-
-          if (!isInRock(testX, testY)) {
-            const dist = Math.sqrt((testX - hero.x) ** 2 + (testY - hero.y) ** 2);
-            if (dist < closestDistance) {
-              closestDistance = dist;
-              closestValidPoint = { x: testX, y: testY };
-            }
-          }
-        }
+    // Check if new position would be in rock
+    if (isInRock(newX, newY)) {
+      // Try horizontal movement only
+      if (!isInRock(newX, hero.y)) {
+        hero.x = newX;
+        hero.vy = 0; // Stop vertical movement
       }
-
-      if (closestValidPoint) {
-        hero.x = closestValidPoint.x;
-        hero.y = closestValidPoint.y;
-        hero.vx *= 0.3;
-        hero.vy *= 0.3;
+      // Try vertical movement only
+      else if (!isInRock(hero.x, newY)) {
+        hero.y = newY;
+        hero.vx = 0; // Stop horizontal movement
       }
+      // Can't move in either direction, stop completely
+      else {
+        hero.vx *= 0.1;
+        hero.vy *= 0.1;
+      }
+    } else {
+      // Safe to move to new position
+      hero.x = newX;
+      hero.y = newY;
     }
 
     // Check collision with rock piles
