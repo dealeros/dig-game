@@ -94,22 +94,74 @@ const SpaceGame = () => {
     const gameState = gameStateRef.current;
     const hero = heroRef.current;
     
-    // Check if click is outside the sphere (in rock area)
+    // Check if click is in a diggable area
     const distanceFromCenter = Math.sqrt((x - gameState.centerX) ** 2 + (y - gameState.centerY) ** 2);
     
+    let canDig = false;
+    let digFromSphere = false;
+    let digFromTunnel = false;
+    
+    // Check if digging from sphere edge
     if (distanceFromCenter > gameState.sphereRadius) {
-      // Check if hero is close enough to dig (within 50 pixels of sphere edge for easier gameplay)
       const heroDistFromCenter = Math.sqrt((hero.x - gameState.centerX) ** 2 + (hero.y - gameState.centerY) ** 2);
       const heroDistFromEdge = Math.abs(heroDistFromCenter - gameState.sphereRadius);
       
       if (heroDistFromEdge < 50) {
+        canDig = true;
+        digFromSphere = true;
+      }
+    }
+    
+    // Check if digging from tunnel edge (expanding existing tunnels)
+    if (!canDig) {
+      for (const tunnel of gameState.tunnels) {
+        const heroDistToTunnel = Math.sqrt((hero.x - tunnel.x) ** 2 + (hero.y - tunnel.y) ** 2);
+        const clickDistToTunnel = Math.sqrt((x - tunnel.x) ** 2 + (y - tunnel.y) ** 2);
+        
+        // Hero is in or near tunnel, and click is outside tunnel but close to it
+        if (heroDistToTunnel < tunnel.radius + 30 && 
+            clickDistToTunnel > tunnel.radius && 
+            clickDistToTunnel < tunnel.radius + gameState.digRadius + 10) {
+          canDig = true;
+          digFromTunnel = true;
+          break;
+        }
+      }
+    }
+    
+    if (canDig) {
+      // Make sure we're not digging into existing tunnels or rock piles
+      let validDigLocation = true;
+      
+      // Check existing tunnels
+      for (const tunnel of gameState.tunnels) {
+        const dist = Math.sqrt((x - tunnel.x) ** 2 + (y - tunnel.y) ** 2);
+        if (dist < tunnel.radius + gameState.digRadius) {
+          validDigLocation = false;
+          break;
+        }
+      }
+      
+      // Check existing rock piles
+      if (validDigLocation) {
+        for (const pile of gameState.rockPiles) {
+          const dist = Math.sqrt((x - pile.x) ** 2 + (y - pile.y) ** 2);
+          if (dist < pile.radius + gameState.digRadius) {
+            validDigLocation = false;
+            break;
+          }
+        }
+      }
+      
+      if (validDigLocation) {
         // Create a new tunnel
         const tunnel = {
           id: Date.now(),
           x,
           y,
           radius: gameState.digRadius,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          source: digFromSphere ? 'sphere' : 'tunnel'
         };
         
         // Calculate the volume of rock being displaced
