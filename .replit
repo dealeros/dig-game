@@ -2,3 +2,41 @@ modules = ["nodejs-20", "web", "python-3.12"]
 
 [nix]
 channel = "stable-25_05"
+
+[workflows]
+runButton = "Start Full App"
+
+[[workflows.workflow]]
+name = "Start Backend"
+author = 45971074
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend && python -m uvicorn server:app --host 0.0.0.0 --port 8000 --reload"
+
+[[workflows.workflow]]
+name = "Start Frontend"
+author = 45971074
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd frontend && yarn start"
+
+[[workflows.workflow]]
+name = "Start Full App"
+author = 45971074
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend && python -m uvicorn server:app --host 0.0.0.0 --port 8000 --reload"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd frontend && yarn start"
+
+[[ports]]
+localPort = 8000
+externalPort = 80
