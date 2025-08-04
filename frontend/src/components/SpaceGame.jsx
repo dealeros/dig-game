@@ -92,6 +92,7 @@ const SpaceGame = () => {
       const clickX = e.clientX - rect.left;
       const clickY = e.clientY - rect.top;
       
+      console.log('Mouse click at:', clickX, clickY);
       digTunnel(clickX, clickY);
     };
 
