@@ -38,5 +38,9 @@ task = "shell.exec"
 args = "cd frontend && yarn start"
 
 [[ports]]
+localPort = 3000
+externalPort = 3000
+
+[[ports]]
 localPort = 8000
 externalPort = 80
