@@ -356,6 +356,8 @@ const SpaceGame = () => {
         <div className="flex gap-4 justify-center text-xs font-mono text-gray-400 mb-4">
           <div>POS: {gameStats.position.x}, {gameStats.position.y}</div>
           <div>VEL: {gameStats.velocity.x}, {gameStats.velocity.y}</div>
+          <div>TUNNELS: {gameStats.tunnelsCount}</div>
+          {gameStats.isDigging && <div className="text-yellow-400">DIGGING...</div>}
         </div>
       </Card>
 
